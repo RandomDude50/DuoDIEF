@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizDuel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'], heading: ['Outfit', 'sans-serif'], arcade: ['"Press Start 2P"', 'monospace'] } } } }
+    </script>
+    <style>
+        :root {
+            --primary-hex: #8b5cf6; --primary-light: #a78bfa;
+            --primary-glow: rgba(139, 92, 246, 0.45); --primary-glow-strong: rgba(139, 92, 246, 0.75);
+            --primary-bg-alpha: rgba(139, 92, 246, 0.15); --secondary-accent: #ec4899;
+            --primary-gradient: linear-gradient(135deg, var(--primary-hex) 0%, var(--secondary-accent) 100%);
+        }
+        body { background: linear-gradient(135deg, #0f172a 0%, #170f2c 35%, #0f172a 100%); min-height: 100vh; color: #f8fafc; overflow-x: hidden; }
+        .glow-orb-primary, .glow-orb-secondary { position: fixed; border-radius: 50%; z-index: 0; pointer-events: none; }
+        .glow-orb-primary { filter: blur(100px); opacity: .4; background: var(--primary-hex); }
+        .glow-orb-secondary { filter: blur(90px); opacity: .3; background: var(--secondary-accent); }
+        .glass-card { background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2); }
+        .theme-text-primary { color: var(--primary-light); }
+        .theme-border-primary { border-color: var(--primary-hex); }
+        .theme-bg-alpha { background-color: var(--primary-bg-alpha); }
+        .theme-icon-bg { background: var(--primary-gradient); box-shadow: 0 8px 20px var(--primary-glow); }
+        .btn-gradient { background: var(--primary-gradient); box-shadow: 0 8px 25px var(--primary-glow); transition: all .3s ease; }
+        .btn-gradient:hover:not(:disabled) { box-shadow: 0 12px 30px var(--primary-glow-strong); transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-gradient:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-ghost { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transition: all .2s; }
+        .btn-ghost:hover { background: rgba(255,255,255,.12); }
+        .field { background: rgba(15,23,42,.8); border: 1px solid rgba(148,163,184,.3); border-radius: 12px; padding: .65rem .9rem; width: 100%; outline: none; color: #f8fafc; }
+        .field:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px var(--primary-bg-alpha); }
+        .field option { background: #0f172a; }
+        .progress-glow { background: var(--primary-gradient); box-shadow: 0 0 15px var(--primary-glow-strong); transition: width .5s ease-out; }
+        .option-btn { position: relative; background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.1); transition: all .25s cubic-bezier(.4,0,.2,1); }
+        .option-btn:hover:not(:disabled) { transform: translateY(-3px) scale(1.015); background: rgba(255,255,255,.08); border-color: var(--primary-light); box-shadow: 0 10px 25px -5px var(--primary-glow-strong); }
+        .option-btn:disabled { cursor: default; }
+        .option-btn.selected { border-color: var(--primary-light); background: var(--primary-bg-alpha); }
+        .option-letter { background: rgba(15,23,42,.8); border: 1px solid rgba(255,255,255,.15); color: var(--primary-light); }
+        .option-btn.correct { background: rgba(34,197,94,.25) !important; border-color: #22c55e !important; box-shadow: 0 0 25px rgba(34,197,94,.5) !important; animation: pulse-correct .5s ease-in-out; }
+        .option-btn.incorrect { background: rgba(239,68,68,.25) !important; border-color: #ef4444 !important; box-shadow: 0 0 25px rgba(239,68,68,.5) !important; animation: shake .4s both; }
+        @keyframes pulse-correct { 50% { transform: scale(1.025); } }
+        @keyframes shake { 10%,90% { transform: translateX(-2px); } 20%,80% { transform: translateX(4px); } 30%,50%,70% { transform: translateX(-6px); } 40%,60% { transform: translateX(6px); } }
+        .timer-bar { transition: width .1s linear; }
+        .preset-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); cursor: pointer; transition: transform .2s; }
+        .preset-btn:hover, .preset-btn.active { transform: scale(1.2); border-color: #fff; }
+
+        /* Podio arcade */
+        .arcade-stage { position: relative; background: #0b0720; border: 3px solid var(--primary-light); border-radius: 16px; padding: 1.5rem 1rem 0; overflow: hidden;
+            box-shadow: 0 0 30px var(--primary-glow-strong), inset 0 0 40px rgba(0,0,0,.6); }
+        .arcade-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0, rgba(0,0,0,.25) 1px, transparent 1px, transparent 3px); }
+        .podium-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 30%; max-width: 150px; }
+        .podium-block { width: 100%; display: flex; align-items: flex-start; justify-content: center; padding-top: .6rem; font-family: 'Press Start 2P', monospace; font-size: 1.4rem; color: #0b0720;
+            transform-origin: bottom; transform: scaleY(0); animation: rise .8s cubic-bezier(.2,1.2,.4,1) forwards; }
+        .podium-1 { background: linear-gradient(#fde047, #f59e0b); height: 150px; animation-delay: 1.6s; }
+        .podium-2 { background: linear-gradient(#e2e8f0, #94a3b8); height: 110px; animation-delay: 1.0s; }
+        .podium-3 { background: linear-gradient(#fdba74, #c2410c); height: 80px; animation-delay: .4s; }
+        .podium-name { font-family: 'Press Start 2P', monospace; font-size: .6rem; text-align: center; word-break: break-all; opacity: 0; animation: fadeUp .5s forwards; }
+        .podium-1-wrap .podium-name { animation-delay: 2.2s; } .podium-2-wrap .podium-name { animation-delay: 1.6s; } .podium-3-wrap .podium-name { animation-delay: 1.0s; }
+        .podium-avatar { font-size: 2rem; opacity: 0; animation: fadeUp .5s forwards; }
+        .podium-1-wrap .podium-avatar { animation-delay: 2.2s; } .podium-2-wrap .podium-avatar { animation-delay: 1.6s; } .podium-3-wrap .podium-avatar { animation-delay: 1.0s; }
+        .winner-crown { animation: bounce-crown 1s ease-in-out infinite 2.4s; }
+        .arcade-title { font-family: 'Press Start 2P', monospace; color: #fde047; text-shadow: 0 0 10px #f59e0b, 3px 3px 0 #b45309; animation: blink 1s steps(2, start) infinite; }
+        @keyframes rise { to { transform: scaleY(1); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes bounce-crown { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes blink { 50% { opacity: .35; } }
+        .hidden-view { display: none !important; }
+    </style>
+</head>
+<body class="font-sans relative">
+    <div class="glow-orb-primary w-96 h-96 top-10 left-10"></div>
+    <div class="glow-orb-secondary w-96 h-96 bottom-10 right-10"></div>
+
+    <div class="relative z-10 w-full max-w-4xl mx-auto p-4 sm:p-6">
+
+        <!-- HEADER -->
+        <header id="appHeader" class="hidden-view glass-card rounded-3xl px-4 sm:px-6 py-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+            <button id="logoBtn" class="flex items-center gap-3 text-left">
+                <div class="w-11 h-11 rounded-2xl theme-icon-bg flex items-center justify-center text-xl">🧠</div>
+                <div>
+                    <h1 class="font-heading font-extrabold text-xl text-white leading-tight">QuizDuel</h1>
+                    <p class="text-xs text-slate-400 font-medium">Sfida in tempo reale</p>
+                </div>
+            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5 mr-1" id="presets"></div>
+                <button id="soundBtn" class="btn-ghost rounded-xl px-3 py-2 text-sm" title="Audio">🔊</button>
+                <button id="adminBtn" class="hidden-view btn-ghost rounded-xl px-3 py-2 text-sm font-semibold">⚙ Admin</button>
+                <button id="lbBtn" class="btn-ghost rounded-xl px-3 py-2 text-sm font-semibold">🏆 Classifica</button>
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-slate-700/80">
+                    <span id="hdrUser" class="text-sm font-semibold"></span>
+                    <span class="text-xs text-slate-400">ELO</span>
+                    <span id="hdrElo" class="font-heading font-extrabold text-amber-300"></span>
+                </div>
+                <button id="logoutBtn" class="btn-ghost rounded-xl px-3 py-2 text-sm" title="Esci">⎋</button>
+            </div>
+        </header>
+
+        <div id="toasts" class="fixed top-4 right-4 z-50 flex flex-col gap-2 w-72"></div>
+
+        <!-- AUTH -->
+        <main id="view-auth" class="hidden-view glass-card rounded-3xl p-6 sm:p-10 max-w-md mx-auto mt-10">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 mx-auto rounded-3xl theme-icon-bg flex items-center justify-center text-3xl mb-3">🧠</div>
+                <h2 class="font-heading text-3xl font-extrabold">QuizDuel</h2>
+                <p class="text-slate-400 text-sm mt-1">Sfida i tuoi amici. Scala la classifica ELO.</p>
+            </div>
+            <form id="authForm" class="space-y-3">
+                <input id="fUsername" class="field" placeholder="Username" autocomplete="username" required>
+                <input id="fEmail" type="email" class="field" placeholder="Email" autocomplete="email">
+                <input id="fPassword" type="password" class="field" placeholder="Password" autocomplete="current-password" required>
+                <p id="authError" class="text-rose-400 text-sm min-h-[1.25rem]"></p>
+                <button class="btn-gradient w-full rounded-2xl py-3 font-heading font-bold text-lg" id="authSubmit">Accedi</button>
+            </form>
+            <button id="authToggle" class="mt-4 w-full text-center text-sm theme-text-primary hover:underline">Non hai un account? Registrati</button>
+        </main>
+
+        <!-- HOME -->
+        <main id="view-home" class="hidden-view space-y-5">
+            <section class="glass-card rounded-3xl p-5 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-heading font-bold text-xl">Il tuo profilo</h2>
+                    <span id="rankBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 border border-slate-700 theme-text-primary"></span>
+                </div>
+                <div id="statsGrid" class="grid grid-cols-2 sm:grid-cols-5 gap-3"></div>
+            </section>
+
+            <div class="grid md:grid-cols-2 gap-5">
+                <section class="glass-card rounded-3xl p-5 sm:p-6 space-y-3">
+                    <h2 class="font-heading font-bold text-xl">Crea una sfida</h2>
+                    <label class="block text-xs text-slate-400 font-semibold uppercase tracking-wider">Topic</label>
+                    <select id="selTopic" class="field"></select>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Domande</label>
+                            <select id="selN" class="field"><option>5</option><option selected>10</option></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Secondi/domanda</label>
+                            <select id="selTime" class="field"><option>10</option><option selected>15</option><option>20</option><option>30</option></select>
+                        </div>
+                    </div>
+                    <p id="createError" class="text-rose-400 text-sm min-h-[1.25rem]"></p>
+                    <button id="createBtn" class="btn-gradient w-full rounded-2xl py-3 font-heading font-bold">Crea lobby</button>
+                </section>
+
+                <section class="glass-card rounded-3xl p-5 sm:p-6 space-y-3">
+                    <h2 class="font-heading font-bold text-xl">Entra in una lobby</h2>
+                    <input id="joinCode" class="field font-arcade text-center tracking-widest uppercase" maxlength="5" placeholder="CODICE">
+                    <p id="joinError" class="text-rose-400 text-sm min-h-[1.25rem]"></p>
+                    <button id="joinBtn" class="btn-gradient w-full rounded-2xl py-3 font-heading font-bold">Entra</button>
+                    <p class="text-xs text-slate-400">Oppure aspetta un invito: comparirà in alto a destra.</p>
+                </section>
+            </div>
+
+            <section class="glass-card rounded-3xl p-5 sm:p-6">
+                <h2 class="font-heading font-bold text-xl mb-3">Storico partite</h2>
+                <div id="history" class="space-y-2"></div>
+            </section>
+        </main>
+
+        <!-- LOBBY -->
+        <main id="view-lobby" class="hidden-view glass-card rounded-3xl p-5 sm:p-8">
+            <div class="text-center mb-6">
+                <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Codice stanza</p>
+                <button id="lobbyCode" class="font-arcade text-3xl sm:text-4xl theme-text-primary mt-2 hover:opacity-80" title="Clicca per copiare"></button>
+                <p id="lobbyInfo" class="text-slate-300 text-sm mt-3"></p>
+            </div>
+            <h3 class="font-heading font-bold mb-2">Giocatori <span id="lobbyCount" class="text-slate-400 text-sm font-medium"></span></h3>
+            <ul id="lobbyPlayers" class="grid sm:grid-cols-2 gap-2 mb-5"></ul>
+            <div class="flex gap-2 mb-5">
+                <input id="inviteName" class="field" placeholder="Invita per username">
+                <button id="inviteBtn" class="btn-ghost rounded-xl px-5 font-semibold whitespace-nowrap">Invita</button>
+            </div>
+            <p id="lobbyMsg" class="text-sm min-h-[1.25rem] mb-3"></p>
+            <div class="flex justify-between gap-3">
+                <button id="leaveBtn" class="btn-ghost rounded-2xl px-5 py-3 font-semibold">← Esci</button>
+                <button id="startBtn" class="btn-gradient rounded-2xl px-8 py-3 font-heading font-bold text-lg">Avvia partita</button>
+            </div>
+        </main>
+
+        <!-- GAME -->
+        <main id="view-game" class="hidden-view glass-card rounded-3xl p-5 sm:p-8 md:p-10">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <span id="gTopic" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700"></span>
+                <div class="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-700/80">
+                    <span>🏆</span><span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Punti:</span>
+                    <span id="liveScore" class="font-heading font-extrabold text-lg text-amber-300">0</span>
+                </div>
+            </div>
+            <div class="mb-5">
+                <div class="flex justify-between text-xs font-semibold text-slate-400 mb-2">
+                    <span id="gCounter">Domanda 1 di 10</span>
+                    <span id="gTimerText" class="font-heading text-base text-white">15</span>
+                </div>
+                <div class="w-full bg-slate-900/80 rounded-full h-3 p-0.5 border border-slate-700/50 mb-2">
+                    <div id="gProgress" class="progress-glow h-full rounded-full" style="width:10%"></div>
+                </div>
+                <div class="w-full bg-slate-900/80 rounded-full h-2 overflow-hidden">
+                    <div id="gTimerBar" class="timer-bar h-full rounded-full bg-amber-400" style="width:100%"></div>
+                </div>
+            </div>
+            <h2 id="gQuestion" class="font-heading font-bold text-lg sm:text-xl md:text-2xl leading-snug min-h-[60px] flex items-center mb-5"></h2>
+            <div id="gOptions" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5"></div>
+            <p id="gWaiting" class="text-sm text-slate-400 min-h-[1.25rem] mb-3"></p>
+            <div id="gFeedback" class="hidden-view rounded-2xl p-4 mb-5 border text-sm leading-relaxed"></div>
+            <div id="gScoreboard" class="hidden-view rounded-2xl p-4 bg-slate-900/60 border border-slate-800"></div>
+        </main>
+
+        <!-- RESULTS -->
+        <main id="view-results" class="hidden-view space-y-5">
+            <section class="glass-card rounded-3xl p-5 sm:p-8 text-center">
+                <h2 class="arcade-title text-lg sm:text-2xl mb-5">★ PODIO ★</h2>
+                <div id="podium" class="arcade-stage flex items-end justify-center gap-2 sm:gap-4 min-h-[280px]"></div>
+                <p id="resMeta" class="text-slate-400 text-xs mt-4"></p>
+            </section>
+            <section class="glass-card rounded-3xl p-5 sm:p-6">
+                <h3 class="font-heading font-bold text-xl mb-3">Classifica e variazione ELO</h3>
+                <div id="resRanking" class="space-y-2"></div>
+            </section>
+            <section class="glass-card rounded-3xl p-5 sm:p-6">
+                <h3 class="font-heading font-bold text-xl mb-3">Il tuo resoconto</h3>
+                <div id="resAnswers" class="space-y-3"></div>
+            </section>
+            <div class="flex justify-center gap-3">
+                <button id="resHome" class="btn-gradient rounded-2xl px-8 py-3 font-heading font-bold">Torna alla home</button>
+                <button id="resLb" class="btn-ghost rounded-2xl px-6 py-3 font-semibold">🏆 Classifica</button>
+            </div>
+        </main>
+
+        <!-- LEADERBOARD -->
+        <main id="view-leaderboard" class="hidden-view glass-card rounded-3xl p-5 sm:p-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-heading font-bold text-2xl">🏆 Classifica globale</h2>
+                <button id="lbBack" class="btn-ghost rounded-xl px-4 py-2 text-sm font-semibold">← Indietro</button>
+            </div>
+            <div id="lbList" class="space-y-2"></div>
+        </main>
+
+        <!-- ADMIN: gestione quiz -->
+        <main id="view-admin" class="hidden-view glass-card rounded-3xl p-5 sm:p-8 space-y-5">
+            <div class="flex items-center justify-between">
+                <h2 class="font-heading font-bold text-2xl">⚙ Gestione quiz</h2>
+                <button id="admBack" class="btn-ghost rounded-xl px-4 py-2 text-sm font-semibold">← Indietro</button>
+            </div>
+            <div class="grid md:grid-cols-[1fr_2fr] gap-5">
+                <section class="space-y-3">
+                    <h3 class="font-heading font-bold">Topic</h3>
+                    <div id="admTopics" class="space-y-2"></div>
+                    <div class="flex gap-2">
+                        <input id="admNewTopic" class="field" placeholder="Nuovo topic">
+                        <button id="admAddTopic" class="btn-gradient rounded-xl px-4 font-bold">+</button>
+                    </div>
+                </section>
+                <section class="space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <h3 id="admQTitle" class="font-heading font-bold">Seleziona un topic</h3>
+                        <button id="admNewQ" class="hidden-view btn-gradient rounded-xl px-4 py-2 text-sm font-semibold">+ Domanda</button>
+                    </div>
+                    <div id="admQuestions" class="space-y-2"></div>
+                    <form id="admForm" class="hidden-view space-y-2 border-t border-slate-700 pt-4">
+                        <textarea id="qText" class="field" rows="2" placeholder="Testo della domanda" required></textarea>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input class="field qOpt" placeholder="Opzione A" required>
+                            <input class="field qOpt" placeholder="Opzione B" required>
+                            <input class="field qOpt" placeholder="Opzione C" required>
+                            <input class="field qOpt" placeholder="Opzione D" required>
+                        </div>
+                        <select id="qCorrect" class="field">
+                            <option value="0">Risposta corretta: A</option>
+                            <option value="1">Risposta corretta: B</option>
+                            <option value="2">Risposta corretta: C</option>
+                            <option value="3">Risposta corretta: D</option>
+                        </select>
+                        <textarea id="qExpl" class="field" rows="2" placeholder="Spiegazione (opzionale)"></textarea>
+                        <p id="qError" class="text-rose-400 text-sm min-h-[1.25rem]"></p>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" id="qCancel" class="btn-ghost rounded-xl px-4 py-2 text-sm">Annulla</button>
+                            <button class="btn-gradient rounded-xl px-5 py-2 font-semibold text-sm">Salva</button>
+                        </div>
+                    </form>
+                    <p id="admMsg" class="text-sm min-h-[1.25rem]"></p>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
